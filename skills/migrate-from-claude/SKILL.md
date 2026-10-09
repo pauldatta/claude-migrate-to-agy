@@ -45,10 +45,10 @@ Pass `--project` only for real project folders. If the workspace is the home dir
 
 ## 3. Apply
 
-Only after the user approves in a new message. This plugin ships a `PreToolUse` hook that makes Antigravity ask for confirmation (`force_ask`) before any `apply.py --apply` runs, so expect that prompt:
+Only after the user approves in a new message. The dry run prints a **Plan ID**. `--apply` refuses to write unless you pass the ID of the plan the user approved, so if anything changed, show the new plan first:
 
 ```bash
-python3 <SKILL_DIR>/scripts/apply.py --inventory /tmp/claude-inventory.json --apply
+python3 <SKILL_DIR>/scripts/apply.py --inventory /tmp/claude-inventory.json --apply --plan-id <PLAN_ID>
 ```
 
 Existing generated plugins and any `AGENTS.md` the script edits are backed up with a `.bak-<timestamp>` suffix first. Re-running is safe.

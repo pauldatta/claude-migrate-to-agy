@@ -23,7 +23,7 @@ The `migrate-from-claude` skill takes it from there.
 
 1. **Discover (read-only).** Scans `~/.claude`, `~/.claude.json`, the Claude Desktop config, and the projects you name. It never opens credential files or chat transcripts. It only counts them.
 2. **Plan.** Shows three tables: what moves over, what you need to check, and what stays behind.
-3. **Apply (after you say yes).** Writes Antigravity plugins and backs up anything it replaces. Running it again is safe.
+3. **Apply (after you say yes).** The dry run prints a plan ID, and `--apply` refuses to write unless it gets that ID. agy also asks before running the command. It writes Antigravity plugins and backs up anything it replaces. Running it again is safe.
 4. **Verify.** You run `/plugin list` and `/context` in agy to confirm what loaded.
 
 Every source becomes its own plugin, so you can switch any of them off with `agy plugin disable <name>`:
@@ -70,7 +70,7 @@ The skill uses two standard-library Python scripts (Python 3.9+):
 S=~/.gemini/config/plugins/claude-migrate-to-agy/skills/migrate-from-claude/scripts
 python3 $S/discover.py --project ~/code/my-service > /tmp/inv.json
 python3 $S/apply.py --inventory /tmp/inv.json            # dry run
-python3 $S/apply.py --inventory /tmp/inv.json --apply    # write
+python3 $S/apply.py --inventory /tmp/inv.json --apply --plan-id <id-from-dry-run>
 ```
 
 ## Tests

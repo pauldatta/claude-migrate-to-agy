@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import re
 import shutil
@@ -452,19 +453,35 @@ def apply(plan: Plan) -> list[str]:
     return log
 
 
+def plan_id(plan: Plan) -> str:
+    """Short fingerprint of exactly what would be written. --apply must quote it."""
+    h = hashlib.sha256(render(plan).encode("utf-8"))
+    for dest in sorted(map(str, plan.files)):
+        h.update(dest.encode() + b"\0" + plan.files[Path(dest)].encode())
+    return h.hexdigest()[:8]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--inventory", required=True, help="JSON from discover.py ('-' for stdin)")
     ap.add_argument("--gemini-config", help="Antigravity config dir (default: <home>/.gemini/config)")
     ap.add_argument("--apply", action="store_true", help="write files (default: dry run)")
+    ap.add_argument("--plan-id", help="plan ID printed by the dry run; required with --apply")
     args = ap.parse_args(argv)
     inv = json.load(sys.stdin if args.inventory == "-" else open(args.inventory, encoding="utf-8"))
     gemini_config = Path(args.gemini_config) if args.gemini_config else Path(inv["home"]) / ".gemini" / "config"
     plan = build_plan(inv, gemini_config)
+    pid = plan_id(plan)
     sys.stdout.write(render(plan))
+    sys.stdout.write(f"\nPlan ID: {pid}\n")
     if not args.apply:
-        sys.stdout.write("\nDry run: nothing written. Re-run with --apply to write these files.\n")
+        sys.stdout.write("\nDry run: nothing written. After the user approves this plan, re-run with "
+                         f"--apply --plan-id {pid}\n")
         return 0
+    if args.plan_id != pid:
+        sys.stdout.write(f"\nRefusing to write: --plan-id {args.plan_id!r} does not match this plan ({pid}). "
+                         "Show the user the current plan and get approval first.\n")
+        return 2
     sys.stdout.write("\n## Applied\n\n" + "\n".join(f"- {line}" for line in apply(plan)) + "\n")
     sys.stdout.write("\nNext: restart agy, then run /plugin list and /context to confirm what loaded.\n")
     return 0

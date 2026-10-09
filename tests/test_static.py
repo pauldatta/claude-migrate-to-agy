@@ -22,7 +22,7 @@ def test_scripts_have_no_mock_paths():
 
 
 def test_scripts_are_stdlib_only():
-    allowed = {"__future__", "argparse", "datetime", "json", "os", "re", "shutil", "sys", "pathlib"}
+    allowed = {"__future__", "argparse", "datetime", "hashlib", "json", "os", "re", "shutil", "sys", "pathlib"}
     for script in SCRIPTS.glob("*.py"):
         tree = ast.parse(script.read_text(encoding="utf-8"))
         for node in ast.walk(tree):

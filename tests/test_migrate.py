@@ -55,6 +55,13 @@ def build_home(tmp: Path) -> tuple[Path, Path]:
     return home, proj
 
 
+def apply_plan(inv_path):
+    """Dry run, read the plan ID, then apply with it (the approved path)."""
+    out = run(SCRIPTS / "apply.py", "--inventory", inv_path)
+    pid = out.split("Plan ID: ")[1].split()[0]
+    return run(SCRIPTS / "apply.py", "--inventory", inv_path, "--apply", "--plan-id", pid)
+
+
 def discover(tmp, home, proj):
     out = run(SCRIPTS / "discover.py", "--home", home, "--project", proj, env_home=home)
     inv_path = tmp / "inv.json"
@@ -87,7 +94,7 @@ def test_dry_run_writes_nothing(tmp_path):
 def test_apply_layout_and_conversions(tmp_path):
     home, proj = build_home(tmp_path)
     _, inv_path = discover(tmp_path, home, proj)
-    run(SCRIPTS / "apply.py", "--inventory", inv_path, "--apply")
+    apply_plan(inv_path)
     cfg = home / ".gemini" / "config" / "plugins"
 
     manifest = json.loads((cfg / "claude-user" / "plugin.json").read_text())
@@ -140,9 +147,9 @@ def test_apply_layout_and_conversions(tmp_path):
 def test_rerun_backs_up_and_is_idempotent(tmp_path):
     home, proj = build_home(tmp_path)
     _, inv_path = discover(tmp_path, home, proj)
-    run(SCRIPTS / "apply.py", "--inventory", inv_path, "--apply")
+    apply_plan(inv_path)
     write(proj / "AGENTS.md", (proj / "AGENTS.md").read_text())  # unchanged content
-    run(SCRIPTS / "apply.py", "--inventory", inv_path, "--apply")
+    apply_plan(inv_path)
     cfg = home / ".gemini" / "config" / "plugins"
     assert list(cfg.glob("claude-user.bak-*"))
     assert (proj / "AGENTS.md").read_text().count("@[CLAUDE.md](CLAUDE.md)") == 1
@@ -152,7 +159,19 @@ def test_existing_agy_mcp_name_is_not_overwritten(tmp_path):
     home, proj = build_home(tmp_path)
     write(home / ".gemini" / "config" / "mcp_config.json", json.dumps({"mcpServers": {"local": {"command": "mine"}}}))
     _, inv_path = discover(tmp_path, home, proj)
-    out = run(SCRIPTS / "apply.py", "--inventory", inv_path, "--apply")
+    out = apply_plan(inv_path)
     assert "MCP local" in out
     user_mcp = home / ".gemini" / "config" / "plugins" / "claude-user" / "mcp_config.json"
     assert not user_mcp.exists() or "local" not in json.loads(user_mcp.read_text())["mcpServers"]
+
+
+def test_apply_refuses_without_matching_plan_id(tmp_path):
+    home, proj = build_home(tmp_path)
+    _, inv_path = discover(tmp_path, home, proj)
+    res = subprocess.run([sys.executable, str(SCRIPTS / "apply.py"), "--inventory", str(inv_path), "--apply"],
+                         capture_output=True, text=True)
+    assert res.returncode == 2 and "Refusing to write" in res.stdout
+    res = subprocess.run([sys.executable, str(SCRIPTS / "apply.py"), "--inventory", str(inv_path), "--apply",
+                          "--plan-id", "deadbeef"], capture_output=True, text=True)
+    assert res.returncode == 2
+    assert not (home / ".gemini").exists() and not (proj / "AGENTS.md").exists()

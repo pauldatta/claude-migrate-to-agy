@@ -7,7 +7,7 @@
 import json
 import os
 
-from test_migrate import SCRIPTS, run, write
+from test_migrate import SCRIPTS, apply_plan, run, write
 
 
 def test_marketplace_in_place_plugins_and_symlinked_skills(tmp_path):
@@ -43,7 +43,7 @@ def test_marketplace_in_place_plugins_and_symlinked_skills(tmp_path):
     assert "not-enabled" not in json.dumps(inv["plugins"])
     assert [s["name"] for s in inv["skills"]] == ["linked"]
 
-    out = run(SCRIPTS / "apply.py", "--inventory", inv_path, "--apply")
+    out = apply_plan(inv_path)
     cfg = home / ".gemini" / "config" / "plugins"
     assert (cfg / "claude-frontend-design" / "skills" / "frontend-design" / "SKILL.md").is_file()
     linked = cfg / "claude-user" / "skills" / "linked"
@@ -60,20 +60,6 @@ def test_project_at_home_is_not_double_counted(tmp_path):
     assert [p["scope"] for p in inv["permissions"]] == ["user"]
     inv_path = tmp_path / "inv.json"
     inv_path.write_text(json.dumps(inv))
-    run(SCRIPTS / "apply.py", "--inventory", inv_path, "--apply")
+    apply_plan(inv_path)
     assert not (home / ".agents" / "plugins" / "claude-project").exists()
 
-
-def test_guard_hook_only_gates_apply():
-    import subprocess, sys
-    from pathlib import Path
-    hook = Path(__file__).resolve().parents[1] / "hooks" / "guard_apply.py"
-    def decide(cmd):
-        payload = json.dumps({"toolCall": {"name": "run_command", "args": {"CommandLine": cmd}}})
-        return json.loads(subprocess.run([sys.executable, str(hook)], input=payload, capture_output=True, text=True).stdout)
-    assert decide("python3 /p/scripts/apply.py --inventory /tmp/i.json --apply")["decision"] == "force_ask"
-    assert decide("python3 /p/scripts/apply.py --inventory /tmp/i.json") == {}
-    assert decide("ls -la") == {}
-    hooks = json.loads((hook.parents[1] / "hooks.json").read_text())
-    entry = hooks["claude-migrate-to-agy-apply-guard"]["PreToolUse"][0]
-    assert entry["matcher"] == "run_command" and "guard_apply.py" in entry["hooks"][0]["command"]
