@@ -1,0 +1,5 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "claude-migrate-to-agy",
+  "description": "Finds your Claude Code skills, commands, subagents, plugins, MCP servers and hooks, shows a migration plan, and configures Antigravity after you approve."
+}
